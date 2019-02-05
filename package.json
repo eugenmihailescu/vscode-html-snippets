@@ -1,0 +1,50 @@
+{
+  "name": "vscode-html-snippets",
+  "version": "1.0.0",
+  "description": "Provides a set of custom HTML snippets for VSCode",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "build": "babel-node ./src/bootstrap.js",
+    "babel-node": "babel-node --presets=env"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eugenmihailescu/vscode-html-snippets.git"
+  },
+  "keywords": [
+    "vscode",
+    "html",
+    "snippets"
+  ],
+  "author": "Eugen Mihailescu",
+  "license": "Unlicense",
+  "bugs": {
+    "url": "https://github.com/eugenmihailescu/vscode-html-snippets/issues"
+  },
+  "homepage": "https://github.com/eugenmihailescu/vscode-html-snippets#readme",
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "current"
+          }
+        }
+      ]
+    ]
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.2.3",
+    "@babel/core": "^7.2.2",
+    "@babel/node": "^7.2.2",
+    "@babel/preset-env": "^7.3.1",
+    "download-git-repo": "^1.1.0",
+    "eslint-plugin-node": "^8.0.1",
+    "jest": "^24.0.0",
+    "temp": "^0.9.0",
+    "xml2js": "^0.4.19"
+  },
+  "dependencies": {}
+}
