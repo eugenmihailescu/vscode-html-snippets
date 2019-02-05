@@ -5,8 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "build": "babel-node ./src/bootstrap.js",
-    "babel-node": "babel-node --presets=env"
+    "build": "babel-node index.js"
   },
   "repository": {
     "type": "git",
@@ -46,5 +45,10 @@
     "temp": "^0.9.0",
     "xml2js": "^0.4.19"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "snippets": {
+    "git": {
+      "joshnh/HTML-Snippets": "/**/*.sublime-snippet"
+    }
+  }
 }

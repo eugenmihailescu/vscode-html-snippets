@@ -1,101 +1,121 @@
 import download from "download-git-repo";
-import { readFile, writeFile } from "fs";
+import { readFile } from "fs";
 import { glob } from "glob";
-import { basename, extname } from "path";
 import { mkdir, track } from "temp";
 import { parseString } from "xml2js";
+import pkgjson from "../package.json";
 
-const colorOutput = (message, color, bright = "\x1b[1m") => {
-	console.log("\x1b[0m" + (bright ? bright : "") + color + message + "\x1b[0m");
+/**
+ * @description Write the given data to the stream
+ * @param {Writable} writer A writtable stream (eg. filestream|stdout, etc)
+ * @param {Object} data The data to write
+ * @returns {Promise}
+ */
+const writeOutput = (writer, data) => {
+	return new Promise((resolve, reject) => {
+		writer.on("error", () => reject(false));
+		writer.on("finish", () => resolve(data));
+		writer.write(JSON.stringify(data, null, 2), "utf8");
+		writer.end();
+	});
 };
 
-// poor's man help
-if (process.argv.length < 3) {
-	colorOutput(
-		"Missing argument! The script's first argument should indicate the filename where the VSCode HTML snippets are going to be saved",
-		"\x1b[41m"
-	);
-
-	console.log();
-
-	colorOutput("Example:", "\x1b[32m");
-
-	colorOutput(
-		"\tnpm run " +
-      basename(process.argv[1]) +
-      " -- /path/to/vscode-snippets.file",
-		"\x1b[33m"
-	);
-
-	console.log();
-}
-
-// output filename
-const snippetFilename = process.argv[2];
-
-// Automatically track and cleanup temps at exit
-track();
-
-// create a tempdir
-mkdir("html-snippets", function(err, dirPath) {
-	// download the source Github HTML snippets for Sublime
-	download("joshnh/HTML-Snippets", dirPath, { clone: false }, function(err) {
-		if (err) {
-			throw err;
-		}
-
-		// iterate through snippets files
-		glob(dirPath + "/**/*.sublime-snippet", function(err, files) {
+/**
+ * @description Parse the given Sublime XML-formatted snippet file
+ * @param {String} filename The source snippet filename
+ * @returns {Promise}
+ */
+const parseSnippetFile = filename => {
+	return new Promise((resolve, reject) => {
+		// open the snippet file
+		readFile(filename, function(err, buffer) {
 			if (err) {
-				throw err;
+				reject(err);
 			}
 
-			var vscode_snippets = {};
+			const xml = buffer.toString("utf8");
 
-			files.forEach(filename => {
-				// open the snippet file
-				readFile(filename, function(err, buffer) {
+			// parse the snippet's XML
+			parseString(xml, function(err, json) {
+				if (err) {
+					reject(err);
+				}
+				const sublime_snippet = json.snippet;
+
+				// build the target VSCode snippet entry
+				const vscode_snippet = {
+					prefix: sublime_snippet.tabTrigger.join(),
+					scope: "html",
+					body: sublime_snippet.content.join("").split("\n"),
+					description: sublime_snippet.description.join()
+				};
+
+				resolve({
+					[sublime_snippet.tabTrigger]: vscode_snippet
+				});
+			});
+		});
+	});
+};
+
+/**
+ * @description Parses the given collection of Sublime XML-formatted snippet files
+ * @param {Array} files The files
+ * @param {Writable} writer A writtable stream (eg. filestream|stdout, etc)
+ * @param {callback} resolve A callback triggered on success
+ * @param {callback} reject A callback triggered on error
+ */
+const parseSnippetFiles = (files, writer, resolve, reject) => {
+	// schedule snippets parsing
+	let promises = files.map(filename => parseSnippetFile(filename));
+
+	// when all resolved or rejected
+	Promise.all(promises)
+		.then(snippets => {
+			writeOutput(writer, Object.assign({}, ...snippets))
+				.then(resolve)
+				.catch(reject);
+		})
+		.catch(err => {
+			reject(err);
+		});
+};
+
+/**
+/**
+ * @description Builds the HTML snippet settings file for VSCode
+ * @param {Writable} writer A writtable stream (eg. filestream|stdout, etc)
+ * @return {Promise}
+ */
+const extractSnippets = writer => {
+	return new Promise((resolve, reject) => {
+		// Automatically track and cleanup temps at exit
+		track();
+
+		// create a tempdir
+		mkdir("html-snippets", function(err, dirPath) {
+			// fetch, parse and build the HTML snippets for each given repo in `snippets` (see packages.json)
+
+			Object.keys(pkgjson.snippets.git).forEach(repo => {
+				// download the source Github HTML snippets for Sublime
+				download(repo, dirPath, { clone: false }, function(err) {
 					if (err) {
-						throw err;
+						reject(err);
 					}
 
-					const xml = buffer.toString("utf8");
-
-					// parse the snippet's XML
-					parseString(xml, function(err, json) {
+					// iterate through snippets files
+					glob(dirPath + pkgjson.snippets.git[repo], function(err, files) {
 						if (err) {
-							throw err;
+							reject(err);
 						}
-						const sublime_snippet = json.snippet;
 
-						// build the target VSCode snippet entry
-						const vscode_snippet = {
-							prefix: sublime_snippet.tabTrigger.join(),
-							scope: "html",
-							body: sublime_snippet.content.join("").split("\n"),
-							description: sublime_snippet.description.join()
-						};
-
-						vscode_snippets[
-							"html-" + sublime_snippet.tabTrigger
-						] = vscode_snippet;
-
-						// write the snippets to the output file
-						writeFile(
-							snippetFilename,
-							JSON.stringify(vscode_snippets, null, 2),
-							function(err) {
-								if (err) {
-									throw err;
-								}
-								console.log(
-									"- " + basename(filename).replace(extname(filename), "")
-								);
-							}
-						);
+						// schedule snippets parsing
+						parseSnippetFiles(files, writer, resolve, reject);
 					});
 				});
 			});
 		});
 	});
-});
+};
+
+export default extractSnippets;
